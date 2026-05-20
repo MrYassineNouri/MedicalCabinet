@@ -13,8 +13,7 @@ public class PatientService {
 
     public void addPatient(Patient patient) {
 
-        String sql =
-                "INSERT INTO patients(firstName,lastName,phone,age) VALUES(?,?,?,?)";
+        String sql = "INSERT INTO patients(firstName,lastName,email,phone,age) VALUES(?,?,?,?,?)";
 
         try (Connection conn = DatabaseConnection.connect()) {
 
@@ -22,8 +21,9 @@ public class PatientService {
 
             pstmt.setString(1, patient.getFirstName());
             pstmt.setString(2, patient.getLastName());
-            pstmt.setString(3, patient.getPhone());
-            pstmt.setInt(4, patient.getAge());
+            pstmt.setString(3, patient.getEmail());   // ✅ NEW
+            pstmt.setString(4, patient.getPhone());
+            pstmt.setInt(5, patient.getAge());
 
             pstmt.executeUpdate();
 
@@ -34,7 +34,8 @@ public class PatientService {
 
     public void updatePatient(Patient patient) {
 
-        String sql = "UPDATE patients SET firstName=?, lastName=?, phone=?, age=? WHERE id=?";
+        String sql =
+                "UPDATE patients SET firstName=?, lastName=?, email=?, phone=?, age=? WHERE id=?";
 
         try (Connection conn = DatabaseConnection.connect()) {
 
@@ -42,9 +43,10 @@ public class PatientService {
 
             pstmt.setString(1, patient.getFirstName());
             pstmt.setString(2, patient.getLastName());
-            pstmt.setString(3, patient.getPhone());
-            pstmt.setInt(4, patient.getAge());
-            pstmt.setInt(5, patient.getId());
+            pstmt.setString(3, patient.getEmail());
+            pstmt.setString(4, patient.getPhone());
+            pstmt.setInt(5, patient.getAge());
+            pstmt.setInt(6, patient.getId());
 
             pstmt.executeUpdate();
 
@@ -98,7 +100,8 @@ public class PatientService {
                         rs.getString("firstName"),
                         rs.getString("lastName"),
                         rs.getString("phone"),
-                        rs.getInt("age")
+                        rs.getInt("age"),
+                        rs.getString("email")   // ✅ NEW
                 );
 
                 patients.add(patient);
@@ -130,7 +133,8 @@ public class PatientService {
                         rs.getString("firstName"),
                         rs.getString("lastName"),
                         rs.getString("phone"),
-                        rs.getInt("age")
+                        rs.getInt("age"),
+                        rs.getString("email")   // ✅ NEW
                 );
 
                 patients.add(patient);

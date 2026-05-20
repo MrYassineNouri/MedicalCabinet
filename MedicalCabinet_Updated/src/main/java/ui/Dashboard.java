@@ -24,7 +24,8 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
-
+import services.EmailService;
+import java.io.File;
 import javafx.stage.FileChooser;
 import java.io.File;
 import java.io.IOException;
@@ -48,6 +49,7 @@ public class Dashboard extends Application {
     private TextField lastNameField;
     private TextField phoneField;
     private TextField ageField;
+    private TextField emailField;
     private TextField searchField;
     private Label resultLabel;
 
@@ -161,11 +163,13 @@ public class Dashboard extends Application {
         lastNameField = createStyledField("Last Name");
         phoneField = createStyledField("Phone");
         ageField = createStyledField("Age");
+        emailField = createStyledField("Email");
 
         addFormRow(form, "First Name", firstNameField, 0);
         addFormRow(form, "Last Name", lastNameField, 1);
         addFormRow(form, "Phone", phoneField, 2);
         addFormRow(form, "Age", ageField, 3);
+        addFormRow(form, "Email", emailField, 4);
 
         HBox buttonBox = new HBox(10);
         buttonBox.setAlignment(Pos.CENTER);
@@ -266,6 +270,7 @@ public class Dashboard extends Application {
 
             private final Button viewButton = new Button("👁 View");
             private final Button pdfButton = new Button("📄 PDF");
+            private final Button emailButton = new Button("✉ Email");
 
             {
                 // VIEW BUTTON
@@ -297,6 +302,30 @@ public class Dashboard extends Application {
                     Patient patient = getTableView().getItems().get(getIndex());
                     exportPatientPDF(patient);
                 });
+                //email button
+                emailButton.setStyle(
+                        "-fx-background-color: #f59e0b;" +
+                                "-fx-text-fill: white;" +
+                                "-fx-font-size: 12px;" +
+                                "-fx-background-radius: 5;" +
+                                "-fx-padding: 5 10 5 10;" +
+                                "-fx-cursor: hand;"
+                );
+                emailButton.setOnAction(event -> {
+
+                    Patient patient = getTableView().getItems().get(getIndex());
+
+                    File pdfFile = generateTempPatientPDF(patient);
+
+                    boolean sent = EmailService.sendReportToPatient(patient, pdfFile);
+
+                    if (sent) {
+                        showSuccess("Report sent to " + patient.getEmail());
+                    } else {
+                        showError("Failed to send email");
+                    }
+                });
+
             }
 
             @Override
@@ -306,7 +335,7 @@ public class Dashboard extends Application {
                 if (empty) {
                     setGraphic(null);
                 } else {
-                    HBox box = new HBox(8, viewButton, pdfButton);
+                    HBox box = new HBox(8, viewButton, pdfButton, emailButton);
                     setGraphic(box);
                 }
             }
@@ -322,12 +351,30 @@ public class Dashboard extends Application {
                 lastNameField.setText(selected.getLastName());
                 phoneField.setText(selected.getPhone());
                 ageField.setText(String.valueOf(selected.getAge()));
+                emailField.setText(selected.getEmail());
             }
         });
 
         rightPanel.getChildren().addAll(searchBox, patientTable);
         return rightPanel;
     }
+
+    private int writeLine(PDPageContentStream content, String text, int y) throws IOException {
+        content.beginText();
+        content.setFont(PDType1Font.HELVETICA, 10);
+        content.newLineAtOffset(50, y);
+
+        if (text.length() > 100) {
+            text = text.substring(0, 100) + "...";
+        }
+
+        content.showText(text);
+        content.endText();
+
+        return y - 15;
+    }
+
+
     private void exportPatientPDF(Patient patient) {
         if (patient == null) return;
 
@@ -349,91 +396,190 @@ public class Dashboard extends Application {
 
             int y = 750;
 
+            // ================= HEADER =================
             content.beginText();
             content.setFont(PDType1Font.HELVETICA_BOLD, 18);
             content.newLineAtOffset(50, y);
-            content.showText("PATIENT REPORT");
+            content.showText("MEDICAL PATIENT REPORT");
             content.endText();
 
             y -= 40;
 
-            content.beginText();
-            content.setFont(PDType1Font.HELVETICA, 12);
-            content.newLineAtOffset(50, y);
-            content.showText("Name: " + patient.getFirstName() + " " + patient.getLastName());
-            content.endText();
+            // ================= PATIENT INFO =================
+            y = writeLine(content, "Patient ID: " + patient.getId(), y);
+            y = writeLine(content, "Name: " + patient.getFirstName() + " " + patient.getLastName(), y);
+            y = writeLine(content, "Phone: " + patient.getPhone(), y);
+            y = writeLine(content, "Age: " + patient.getAge(), y);
 
             y -= 20;
 
-            content.beginText();
-            content.newLineAtOffset(50, y);
-            content.showText("Phone: " + patient.getPhone());
-            content.endText();
-
-            y -= 20;
-
-            content.beginText();
-            content.newLineAtOffset(50, y);
-            content.showText("Age: " + patient.getAge());
-            content.endText();
-
-            y -= 40;
-
-            // Appointments
+            // ================= APPOINTMENTS =================
             content.beginText();
             content.setFont(PDType1Font.HELVETICA_BOLD, 14);
             content.newLineAtOffset(50, y);
-            content.showText("Appointments:");
+            content.showText("APPOINTMENT HISTORY:");
             content.endText();
 
-            y -= 20;
+            y -= 25;
 
             List<Appointment> appointments =
                     appointmentService.getAppointmentsByPatientId(patient.getId());
 
-            for (Appointment a : appointments) {
-                content.beginText();
-                content.setFont(PDType1Font.HELVETICA, 10);
-                content.newLineAtOffset(60, y);
-                content.showText(a.getAppointmentDate() + " " + a.getAppointmentTime() + " - " + a.getReason());
-                content.endText();
-                y -= 15;
+            if (appointments.isEmpty()) {
+                y = writeLine(content, "No appointments found.", y);
+            } else {
+                for (Appointment a : appointments) {
+
+                    y = writeLine(content,
+                            "Date: " + a.getAppointmentDate() + " | Time: " + a.getAppointmentTime(),
+                            y);
+
+                    y = writeLine(content,
+                            "Reason: " + a.getReason(),
+                            y);
+
+                    y -= 10;
+                }
+
             }
 
             y -= 20;
 
-            // Consultations
+            // ================= CONSULTATIONS =================
             content.beginText();
             content.setFont(PDType1Font.HELVETICA_BOLD, 14);
             content.newLineAtOffset(50, y);
-            content.showText("Consultations:");
+            content.showText("CONSULTATION HISTORY:");
             content.endText();
 
-            y -= 20;
+            y -= 25;
 
             List<Consultation> consultations =
                     consultationService.getConsultationsByPatientId(patient.getId());
 
-            for (Consultation c : consultations) {
-                content.beginText();
-                content.setFont(PDType1Font.HELVETICA, 10);
-                content.newLineAtOffset(60, y);
-                content.showText(c.getConsultationDate() + " - " + c.getDiagnosis());
-                content.endText();
-                y -= 15;
+            if (consultations.isEmpty()) {
+                y = writeLine(content, "No consultations found.", y);
+            } else {
+                for (Consultation c : consultations) {
+
+                    y = writeLine(content,
+                            "Date: " + c.getConsultationDate(),
+                            y);
+
+                    y = writeLine(content,
+                            "Diagnosis: " + c.getDiagnosis(),
+                            y);
+
+                    y = writeLine(content,
+                            "Prescription: " + c.getPrescription(),
+                            y);
+
+                    y = writeLine(content,
+                            "Notes: " + c.getNotes(),
+                            y);
+
+                    y -= 10;
+                }
             }
 
             content.close();
-
             document.save(file);
 
-            showSuccess("PDF exported successfully!");
+            showSuccess("Full medical report exported!");
 
         } catch (IOException e) {
             e.printStackTrace();
             showError("Error creating PDF");
         }
     }
+
+    private File generateTempPatientPDF(Patient patient) {
+        try {
+            File tempFile = File.createTempFile("patient_" + patient.getId(), ".pdf");
+            System.out.println("[PDF] Creating temp file: " + tempFile.getAbsolutePath());
+
+            PDDocument document = new PDDocument();
+            PDPage page = new PDPage();
+            document.addPage(page);
+
+            PDPageContentStream content = new PDPageContentStream(document, page);
+            int y = 750;
+
+            content.beginText();
+            content.setFont(PDType1Font.HELVETICA_BOLD, 16);
+            content.newLineAtOffset(50, y);
+            content.showText("MEDICAL REPORT");
+            content.endText();
+            y -= 40;
+
+            y = writeLine(content, "Name: " + clean(patient.getFirstName() + " " + patient.getLastName()), y);
+            y = writeLine(content, "Phone: " + clean(patient.getPhone()), y);
+            y = writeLine(content, "Age: " + patient.getAge(), y);
+            y -= 20;
+
+            content.beginText();
+            content.setFont(PDType1Font.HELVETICA_BOLD, 13);
+            content.newLineAtOffset(50, y);
+            content.showText("APPOINTMENT HISTORY:");
+            content.endText();
+            y -= 20;
+
+            List<Appointment> appointments = appointmentService.getAppointmentsByPatientId(patient.getId());
+            System.out.println("[PDF] Appointments found: " + appointments.size());
+            if (appointments.isEmpty()) {
+                y = writeLine(content, "No appointments found.", y);
+            } else {
+                for (Appointment a : appointments) {
+                    y = writeLine(content, "Date: " + clean(a.getAppointmentDate()) + " | Time: " + clean(a.getAppointmentTime()), y);
+                    y = writeLine(content, "Reason: " + clean(a.getReason()), y);
+                    y -= 8;
+                    if (y < 50) break;
+                }
+            }
+            y -= 20;
+
+            content.beginText();
+            content.setFont(PDType1Font.HELVETICA_BOLD, 13);
+            content.newLineAtOffset(50, y);
+            content.showText("CONSULTATION HISTORY:");
+            content.endText();
+            y -= 20;
+
+            List<Consultation> consultations = consultationService.getConsultationsByPatientId(patient.getId());
+            System.out.println("[PDF] Consultations found: " + consultations.size());
+            if (consultations.isEmpty()) {
+                y = writeLine(content, "No consultations found.", y);
+            } else {
+                for (Consultation c : consultations) {
+                    y = writeLine(content, "Date: " + clean(c.getConsultationDate()), y);
+                    y = writeLine(content, "Diagnosis: " + clean(c.getDiagnosis()), y);
+                    y = writeLine(content, "Prescription: " + clean(c.getPrescription()), y);
+                    y = writeLine(content, "Notes: " + clean(c.getNotes()), y);
+                    y -= 8;
+                    if (y < 50) break;
+                }
+            }
+
+            content.close();
+            document.save(tempFile);
+            document.close();
+
+            System.out.println("[PDF] File saved, size: " + tempFile.length() + " bytes");
+            return tempFile;
+
+        } catch (Exception e) {
+            System.err.println("[PDF] FAILED TO CREATE PDF: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    // strips non-latin characters that PDFBox basic fonts can't handle
+    private String clean(String text) {
+        if (text == null) return "";
+        return text.replaceAll("[^\\x20-\\x7E]", "?");
+    }
+
     private void showPatientHistory(Patient patient) {
         Stage historyStage = new Stage();
         historyStage.setTitle("Patient History - " + patient.getFirstName() + " " + patient.getLastName());
@@ -849,7 +995,8 @@ public class Dashboard extends Application {
                     firstNameField.getText(),
                     lastNameField.getText(),
                     phoneField.getText(),
-                    age
+                    Integer.parseInt(ageField.getText()),
+                    emailField.getText()   // ✅ ADD THIS
             );
 
             patientService.addPatient(patient);
@@ -874,6 +1021,7 @@ public class Dashboard extends Application {
                 selected.setLastName(lastNameField.getText());
                 selected.setPhone(phoneField.getText());
                 selected.setAge(Integer.parseInt(ageField.getText()));
+                selected.setEmail(emailField.getText());
 
                 patientService.updatePatient(selected);
                 refreshTable();
