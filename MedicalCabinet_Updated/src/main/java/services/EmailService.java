@@ -11,9 +11,9 @@ public class EmailService {
 
     private static final String SMTP_HOST = "smtp.gmail.com";
     private static final String SMTP_PORT = "587";
-    private static final String SMTP_USER = "yesfuk26@gmail.com";
-    private static final String SMTP_PASS = "dgfl zzpn uhbp hrzz";
-    private static final String FROM_EMAIL = "yesfuk26@gmail.com";
+    private static final String SMTP_USER = "LOGIN";
+    private static final String SMTP_PASS = "KEY";
+    private static final String FROM_EMAIL = "SAME AS LOGIN";
 
     public static boolean sendReportToPatient(Patient patient, File pdfFile) {
         try {
